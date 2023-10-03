@@ -1,0 +1,57 @@
+cabal-version: 1.12
+
+name:           CS316Coursework2023
+version:        0.1.0.0
+description:    A small JSON query language
+author:         Robert Atkey
+maintainer:     robert.atkey@strath.ac.uk
+copyright:      2023 Robert Atkey
+license:        BSD3
+license-file:   LICENSE
+build-type:     Simple
+extra-source-files:
+    README.md
+    CHANGELOG.md
+
+library
+  exposed-modules:
+      JSON
+      JSONInput
+      JSONOutput
+      JSONTransformer
+      ParserCombinators
+      QueryLanguage
+      Result
+  other-modules:
+      Paths_CS316Coursework2023
+  hs-source-dirs:
+      src
+  ghc-options: -fwarn-incomplete-patterns
+  build-depends:
+      base >=4.7 && <5
+  default-language: Haskell2010
+
+executable json-query
+  main-is: Main.hs
+  other-modules:
+      Paths_CS316Coursework2023
+  hs-source-dirs:
+      app
+  ghc-options: -fwarn-incomplete-patterns -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      CS316Coursework2023
+    , base >=4.7 && <5
+  default-language: Haskell2010
+
+test-suite CS316Coursework2023-test
+  type: exitcode-stdio-1.0
+  main-is: Spec.hs
+  other-modules:
+      Paths_CS316Coursework2023
+  hs-source-dirs:
+      test
+  ghc-options: -fwarn-incomplete-patterns -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      CS316Coursework2023
+    , base >=4.7 && <5
+  default-language: Haskell2010
