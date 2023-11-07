@@ -28,7 +28,7 @@ type Transformer = JSON -> [JSON]
 --
 --  > [String "hello"]
 string :: String -> Transformer
-string = error "UNIMPLEMENTED: string"
+string s _ = [String s]
 
 -- | Ignores the 'JSON' input and returns the given integer as a piece
 -- of 'JSON' in a one element list.
@@ -41,7 +41,7 @@ string = error "UNIMPLEMENTED: string"
 --
 --  > [Number 1234]
 int :: Int -> Transformer
-int = error "UNIMPLEMENTED: int"
+int i _ = [Number i]
 
 -- HINT: these two functions are similar to the 'literal' function in
 -- the paper linked above.
@@ -68,7 +68,9 @@ int = error "UNIMPLEMENTED: int"
 --
 -- because 'Number 1' is not an array.
 elements :: Transformer
-elements = error "UNIMPLEMENTED: elements"
+elements arr = case getElements arr of
+    Nothing -> []
+    Just es -> es
 
 -- HINT: you can use the 'getElements' function from the 'JSON'
 -- module.
@@ -96,7 +98,9 @@ elements = error "UNIMPLEMENTED: elements"
 --
 -- because the field "b" is not in the object.
 field :: String -> Transformer
-field = error "UNIMPLEMENTED: field"
+field k json = case getField k json of
+    Nothing -> []
+    Just v  -> [v]
 
 -- HINT: use 'getField' from the 'JSON' module to define this
 -- function.
@@ -117,7 +121,7 @@ field = error "UNIMPLEMENTED: field"
 --                            x6]]         x6]
 -- @@
 pipe :: Transformer -> Transformer -> Transformer
-pipe = error "UNIMPLEMENTED: pipe"
+pipe t1 t2 json = concatMap t2 (t1 json)
 
 -- HINT: this function is the 'o' function in the paper linked above.
 
@@ -142,7 +146,7 @@ pipe = error "UNIMPLEMENTED: pipe"
 --
 --  > [Boolean False]
 equal :: Transformer -> Transformer -> Transformer
-equal = error "UNIMPLEMENTED: equal"
+equal t1 t2 json = [ Boolean (x == y) | x <- t1 json, y <- t2 json ]
 
 -- HINT: the easiest way to write this function is to use a list
 -- comprehension (Week 4) to get all the pairs returned by the two
@@ -152,7 +156,11 @@ equal = error "UNIMPLEMENTED: equal"
 -- the input, then return the input in a single element list. If the
 -- transformer argument does not return 'true' then return
 select :: Transformer -> Transformer
-select = error "UNIMPLEMENTED: select"
+select t json = if any (extractMaybeBool . getBool) (t json) then [json] else []
+
+extractMaybeBool :: Maybe Bool -> Bool
+extractMaybeBool (Just True) = True
+extractMaybeBool _           = False
 
 -- HINT: you'll need to check to see if the transformer argument
 -- returns 'true' at any point in its list. You can use the 'any'
