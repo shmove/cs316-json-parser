@@ -41,6 +41,8 @@ executable json-query
   build-depends:
       CS316Coursework2023
     , base >=4.7 && <5
+    , HUnit
+    , QuickCheck
   default-language: Haskell2010
 
 test-suite CS316Coursework2023-test
@@ -54,4 +56,6 @@ test-suite CS316Coursework2023-test
   build-depends:
       CS316Coursework2023
     , base >=4.7 && <5
+    , HUnit
+    , QuickCheck
   default-language: Haskell2010
