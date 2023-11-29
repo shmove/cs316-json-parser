@@ -35,7 +35,10 @@ main =
      --
      -- FIXME: What if the user wants a different query? the query
      -- should be taken as an input as well.
-     --
+     putStrLn "Please enter your query:"
+     queryStr <- getLine
+     (query,leftover) <- abortOnError (runParser parseQuery queryStr)
+     
      -- FIXME: the query langauge is quite inexpressive. What if the
      -- user wants all hills over 1000 metres in Scotland and Wales?
      -- or something else? What if they want to transform the input

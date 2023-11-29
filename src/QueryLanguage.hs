@@ -1,6 +1,9 @@
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+{-# HLINT ignore "Use <$>" #-}
 module QueryLanguage where
 
 import JSONTransformer
+import ParserCombinators
 
 data Query
   = Pipe        Query Query
@@ -36,3 +39,68 @@ execute (Equal q1 q2)   = equal (execute q1) (execute q2)
 
 -- HINT: this function is very similar to the 'eval' function for
 -- evaluating Boolean formulas defined in the Week03 problems.
+
+parsePipe :: Parser Query
+parsePipe =
+  do q1 <- parseBaseQueryExpr
+     whitespaces
+     isChar '|'
+     whitespaces
+     q2 <- parseQueryExpr
+     return (Pipe q1 q2)
+
+parseEqual :: Parser Query
+parseEqual =
+  do q1 <- parseBaseQueryExpr
+     whitespaces
+     isChar '='
+     whitespaces
+     q2 <- parseQueryExpr
+     return (Equal q1 q2)
+
+parseElements :: Parser ()
+parseElements =
+  do stringLiteral "Elements"
+     whitespaces
+     return ()
+
+parseSelect :: Parser Query
+parseSelect =
+  do stringLiteral "Select"
+     whitespaces
+     q <- parseQueryExpr
+     return (Select q)
+
+parseBaseQueryExpr :: Parser Query
+parseBaseQueryExpr =
+  do parseElements
+     return Elements
+  `orElse`
+  do select <- parseSelect
+     return select
+  `orElse`
+  do field <- identifier
+     return (Field field)
+  `orElse`
+  do str <- quotedString
+     return (ConstString str)
+  `orElse`
+  do num <- number
+     return (ConstInt num)
+  `orElse`
+  do failParse "Invalid query structure!"
+
+parseQueryExpr :: Parser Query
+parseQueryExpr =
+  do parsePipe
+  `orElse`
+  do parseEqual
+  `orElse`
+  do parseBaseQueryExpr
+  
+parseQuery :: Parser Query
+parseQuery =
+  do whitespaces
+     q <- parseQueryExpr
+     whitespaces
+     return q
