@@ -1,4 +1,4 @@
-module JSONTransformer (Transformer, field, select, pipe, string, int, equal, elements) where
+module JSONTransformer (Transformer, field, select, pipe, string, int, comparison, elements) where
 
 import JSON
 
@@ -127,12 +127,12 @@ pipe t1 t2 json = concatMap t2 (t1 json)
 
 -- | Takes two transformers and an input. Applies the input to the two
 -- transformers to get two lists of values. Compares all pairs of
--- these values for equality, returning 'Boolean True' or 'Boolean
+-- these values, returning 'Boolean True' or 'Boolean
 -- False' for each one.
 --
 -- For example,
 --
---   > equal (string "a") (string "a") (Number 1)
+--   > comparison (==) (string "a") (string "a") (Number 1)
 --
 -- gives
 --
@@ -140,13 +140,16 @@ pipe t1 t2 json = concatMap t2 (t1 json)
 --
 -- and
 --
---  > equal (string "a") (string "b") (Number 1)
+--  > comparison (==) (string "a") (string "b") (Number 1)
 --
 -- gives
 --
 --  > [Boolean False]
-equal :: Transformer -> Transformer -> Transformer
-equal t1 t2 json = [ Boolean (x == y) | x <- t1 json, y <- t2 json ]
+--
+-- This function was previously named 'equal', but has been
+-- redefined to be more general.
+comparison :: (JSON -> JSON -> Bool) -> Transformer -> Transformer -> Transformer
+comparison c t1 t2 json = [ Boolean (x `c` y) | x <- t1 json, y <- t2 json ]
 
 -- HINT: the easiest way to write this function is to use a list
 -- comprehension (Week 4) to get all the pairs returned by the two

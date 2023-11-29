@@ -8,8 +8,10 @@ import ParserCombinators (runParser)
 import QueryLanguage
 import Result
 
-query :: Query
-query = Elements `Pipe` Select (Field "Country" `Equal` ConstString "S")
+-- query :: Query
+-- query = Elements `Pipe` Select (Field "Country" `Equal` ConstString "S")
+-- The new query language way of writing the above is:
+-- query = "Elements | Select .Country == \"S\""
 
 main :: IO ()
 main =
@@ -31,10 +33,7 @@ main =
      -- FIXME: what if the user wants to
      inputJSON <- abortOnError (stringToJSON rawText)
 
-     -- Run the query on the parsed JSON to a list of JSON values
-     --
-     -- FIXME: What if the user wants a different query? the query
-     -- should be taken as an input as well.
+     -- Run the query on the parsed JSON
      putStrLn "Please enter your query:"
      queryStr <- getLine
      (query,leftover) <- abortOnError (runParser parseQuery queryStr)
