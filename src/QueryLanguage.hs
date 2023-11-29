@@ -10,6 +10,7 @@ data Query
   | Field       String
   | Elements
   | Select      Query
+  | ConstBool   Bool
   | ConstInt    Int
   | ConstString String
   | Equal       Query Query
@@ -21,7 +22,7 @@ data Query
   deriving Show
 
 -- | Executes a 'Query' by translating it into a `Transformer`. Each
--- of the constructors of 'Uery' is turned into its corresponding
+-- of the constructors of 'Query' is turned into its corresponding
 -- `Transformer` defined in `JSONTransformer`.
 --
 -- For example:
@@ -38,6 +39,7 @@ execute (Pipe q1 q2)    = pipe (execute q1) (execute q2)
 execute (Field str)     = field str
 execute Elements        = elements
 execute (Select q)      = select (execute q)
+execute (ConstBool b)   = bool b
 execute (ConstInt n)    = int n
 execute (ConstString s) = string s
 execute (Equal q1 q2)          = comparison (==) (execute q1) (execute q2)
@@ -67,7 +69,6 @@ parseComparison c =
       stringLiteral c
       whitespaces
       q2 <- parseBaseQueryExpr
-      whitespaces
       return (q1, q2)
 
 parseBrackets :: Parser Query
@@ -77,7 +78,6 @@ parseBrackets =
      q <- parseQueryExpr
      whitespaces
      isChar ')'
-     whitespaces
      return q
 
 -- | Parses a field name. A field name is a non-empty sequence of
@@ -85,9 +85,7 @@ parseBrackets =
 parseField :: Parser Query
 parseField =
    do isChar '.'
-      whitespaces
       field <- oneOrMore (satisfies "non-whitespace or chain character" (\c -> c /= ' ' && c /= '\n' && c /= '\t' && c /= '.'))
-      whitespaces
       return (Field field)
       
 -- | Parses chained fields. A chained field is a sequence of fields
@@ -104,14 +102,30 @@ parseChainedField :: Parser Query
 parseChainedField =
   do field <- parseField
      chainedField <- parseChainedField
-     whitespaces
      return (Pipe field chainedField)
   `orElse`
   do parseField
 
+parseBool :: Parser Bool
+parseBool =
+  do stringLiteral "true"
+     return True
+  `orElse`
+  do stringLiteral "True"
+     return True
+  `orElse`
+  do stringLiteral "false"
+     return False
+  `orElse`
+  do stringLiteral "False"
+     return False
+
+
 parseBaseQueryExpr :: Parser Query
 parseBaseQueryExpr =
-  do parseBrackets
+  do q <- parseBrackets
+     whitespaces
+     return q
   `orElse`
   do stringLiteral "Elements"
      whitespaces
@@ -122,12 +136,20 @@ parseBaseQueryExpr =
      q <- parseQueryExpr
      return (Select q)
   `orElse`
-  do parseChainedField
+  do q <- parseChainedField
+     whitespaces
+     return q
+  `orElse`
+  do b <- parseBool
+     whitespaces
+     return (ConstBool b)
   `orElse`
   do str <- quotedString
+     whitespaces
      return (ConstString str)
   `orElse`
   do num <- number
+     whitespaces
      return (ConstInt num)
   `orElse`
   do failParse "Invalid query structure!"
@@ -137,21 +159,27 @@ parseQueryExpr =
   do parsePipe
   `orElse`
   do (q1, q2) <- parseComparison "=="
+     whitespaces
      return (Equal q1 q2)
   `orElse`
   do (q1, q2) <- parseComparison "!="
+     whitespaces
      return (NotEqual q1 q2)
   `orElse`
   do (q1, q2) <- parseComparison "<"
+     whitespaces
      return (LessThan q1 q2) 
   `orElse`
   do (q1, q2) <- parseComparison "<="
+     whitespaces
      return (LessOrEqual q1 q2) 
   `orElse`
   do (q1, q2) <- parseComparison ">"
+     whitespaces
      return (GreaterThan q1 q2) 
   `orElse`
   do (q1, q2) <- parseComparison ">="
+     whitespaces
      return (GreaterOrEqual q1 q2) 
   `orElse`
   do parseBaseQueryExpr

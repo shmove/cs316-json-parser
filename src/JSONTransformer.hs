@@ -1,10 +1,11 @@
-module JSONTransformer (Transformer, field, select, pipe, string, int, comparison, elements) where
+module JSONTransformer (Transformer, field, select, pipe, string, int, bool, comparison, elements) where
 
 import JSON
+import Result
 
 -- | A 'Transformer' is a function that takes a single 'JSON' value
 -- and returns a list of 'JSON' values.
-type Transformer = JSON -> [JSON]
+type Transformer = JSON -> Result [JSON]
 
 -- HINT: the design of these transformers is based on the design of
 -- the Jq tool, and this paper on querying XML:
@@ -28,7 +29,7 @@ type Transformer = JSON -> [JSON]
 --
 --  > [String "hello"]
 string :: String -> Transformer
-string s _ = [String s]
+string s _ = Ok [String s]
 
 -- | Ignores the 'JSON' input and returns the given integer as a piece
 -- of 'JSON' in a one element list.
@@ -41,7 +42,12 @@ string s _ = [String s]
 --
 --  > [Number 1234]
 int :: Int -> Transformer
-int i _ = [Number i]
+int i _ = Ok [Number i]
+
+-- | Ignores the 'JSON' input and returns the given boolean as a piece
+-- of 'JSON' in a one element list.
+bool :: Bool -> Transformer
+bool b _ = Ok [Boolean b]
 
 -- HINT: these two functions are similar to the 'literal' function in
 -- the paper linked above.
@@ -69,8 +75,8 @@ int i _ = [Number i]
 -- because 'Number 1' is not an array.
 elements :: Transformer
 elements arr = case getElements arr of
-    Nothing -> []
-    Just es -> es
+    Nothing -> Error "Not an array"
+    Just xs -> Ok xs
 
 -- HINT: you can use the 'getElements' function from the 'JSON'
 -- module.
@@ -99,8 +105,8 @@ elements arr = case getElements arr of
 -- because the field "b" is not in the object.
 field :: String -> Transformer
 field k json = case getField k json of
-    Nothing -> []
-    Just v  -> [v]
+    Nothing -> Error ("Field '" ++ k ++ "' not found / Not an object")
+    Just x  -> Ok [x]
 
 -- HINT: use 'getField' from the 'JSON' module to define this
 -- function.
@@ -121,14 +127,17 @@ field k json = case getField k json of
 --                            x6]]         x6]
 -- @@
 pipe :: Transformer -> Transformer -> Transformer
-pipe t1 t2 json = concatMap t2 (t1 json)
+pipe t1 t2 json =
+    do xs <- t1 json
+       ys <- mapM t2 xs
+       return (concat ys)
 
 -- HINT: this function is the 'o' function in the paper linked above.
 
--- | Takes two transformers and an input. Applies the input to the two
--- transformers to get two lists of values. Compares all pairs of
--- these values, returning 'Boolean True' or 'Boolean
--- False' for each one.
+-- | Takes a comparison function, two transformers and an input.
+-- Applies the input to the two transformers to get two lists of
+-- values. Compares all pairs of these values, returning 
+-- 'Boolean True' or 'Boolean False' for each one.
 --
 -- For example,
 --
@@ -149,7 +158,10 @@ pipe t1 t2 json = concatMap t2 (t1 json)
 -- This function was previously named 'equal', but has been
 -- redefined to be more general.
 comparison :: (JSON -> JSON -> Bool) -> Transformer -> Transformer -> Transformer
-comparison c t1 t2 json = [ Boolean (x `c` y) | x <- t1 json, y <- t2 json ]
+comparison c t1 t2 json =
+    do xs <- t1 json
+       ys <- t2 json
+       return [ Boolean (x `c` y) | x <- xs, y <- ys ]
 
 -- HINT: the easiest way to write this function is to use a list
 -- comprehension (Week 4) to get all the pairs returned by the two
@@ -159,7 +171,9 @@ comparison c t1 t2 json = [ Boolean (x `c` y) | x <- t1 json, y <- t2 json ]
 -- the input, then return the input in a single element list. If the
 -- transformer argument does not return 'true' then return
 select :: Transformer -> Transformer
-select t json = if any (extractMaybeBool . getBool) (t json) then [json] else []
+select t json =
+    do js <- t json
+       if any (extractMaybeBool . getBool) js then return [json] else return []
 
 extractMaybeBool :: Maybe Bool -> Bool
 extractMaybeBool (Just True) = True

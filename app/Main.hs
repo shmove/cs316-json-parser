@@ -38,6 +38,7 @@ main =
      queryStr <- getLine
      (query,leftover) <- abortOnError (runParser parseQuery queryStr)
      
+     putStrLn ("Running query " ++ show query ++ " on " ++ filename ++ "...")
      -- FIXME: the query langauge is quite inexpressive. What if the
      -- user wants all hills over 1000 metres in Scotland and Wales?
      -- or something else? What if they want to transform the input
@@ -46,7 +47,7 @@ main =
      -- FIXME: The query might be incompatible with the input data. It
      -- might mention fields that the input does not have. Can these
      -- errors be reported back to the user nicely?
-     let outputJSONs = execute query inputJSON
+     outputJSONs <- abortOnError (execute query inputJSON)
 
      -- Print the output, one per line.
      --
