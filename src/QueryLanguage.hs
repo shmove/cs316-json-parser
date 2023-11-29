@@ -13,11 +13,11 @@ data Query
   | ConstBool   Bool
   | ConstInt    Int
   | ConstString String
-  | Equal       Query Query
-  | NotEqual    Query Query
-  | LessThan    Query Query
-  | LessOrEqual Query Query
-  | GreaterThan Query Query
+  | Equal          Query Query
+  | NotEqual       Query Query
+  | LessThan       Query Query
+  | LessOrEqual    Query Query
+  | GreaterThan    Query Query
   | GreaterOrEqual Query Query
   deriving Show
 
@@ -52,89 +52,61 @@ execute (GreaterOrEqual q1 q2) = comparison (>=) (execute q1) (execute q2)
 -- HINT: this function is very similar to the 'eval' function for
 -- evaluating Boolean formulas defined in the Week03 problems.
 
-parsePipe :: Parser Query
-parsePipe =
-  do q1 <- parseBaseQueryExpr
-     whitespaces
-     isChar '|'
-     whitespaces
-     q2 <- parseQueryExpr
-     whitespaces
-     return (Pipe q1 q2)
+-- | Query Parsing | --
 
-parseComparison :: String -> Parser (Query, Query)
-parseComparison c =
-   do q1 <- parseBaseQueryExpr
-      whitespaces
-      stringLiteral c
-      whitespaces
-      q2 <- parseBaseQueryExpr
-      return (q1, q2)
-
-parseBrackets :: Parser Query
-parseBrackets =
-  do isChar '('
+-- | Parses a query. A query is a complex query expression surrounded by whitespace.
+parseQuery :: Parser Query
+parseQuery =
+  do whitespaces
+     q <- parseComplexQueryExpr
      whitespaces
-     q <- parseQueryExpr
-     whitespaces
-     isChar ')'
      return q
 
--- | Parses a field name. A field name is a non-empty sequence of
--- non whitespace characters, except for the dot character '.'.
-parseField :: Parser Query
-parseField =
-   do isChar '.'
-      field <- oneOrMore (satisfies "non-whitespace or chain character" (\c -> c /= ' ' && c /= '\n' && c /= '\t' && c /= '.'))
-      return (Field field)
-      
--- | Parses chained fields. A chained field is a sequence of fields
--- separated by the dot character '.'.
---
--- For example:
---
--- >  parseChainedField "a.b.c"
---
--- returns
---
--- >  Pipe (Field "a") (Pipe (Field "b") (Field "c"))
-parseChainedField :: Parser Query
-parseChainedField =
-  do field <- parseField
-     chainedField <- parseChainedField
-     return (Pipe field chainedField)
+-- | Parses a complex query expression. A complex query expression is one of the following:
+-- - A query expression that splits into a base query expression and a complex query expression, separated by some operator.
+-- - A base query expression.
+parseComplexQueryExpr :: Parser Query
+parseComplexQueryExpr =
+  do (q1, q2) <- parseDualExpr "|"
+     whitespaces
+     return (Pipe q1 q2)
   `orElse`
-  do parseField
+  do (q1, q2) <- parseDualExpr "=="
+     whitespaces
+     return (Equal q1 q2)
+  `orElse`
+  do (q1, q2) <- parseDualExpr "!="
+     whitespaces
+     return (NotEqual q1 q2)
+  `orElse`
+  do (q1, q2) <- parseDualExpr "<"
+     whitespaces
+     return (LessThan q1 q2) 
+  `orElse`
+  do (q1, q2) <- parseDualExpr "<="
+     whitespaces
+     return (LessOrEqual q1 q2) 
+  `orElse`
+  do (q1, q2) <- parseDualExpr ">"
+     whitespaces
+     return (GreaterThan q1 q2) 
+  `orElse`
+  do (q1, q2) <- parseDualExpr ">="
+     whitespaces
+     return (GreaterOrEqual q1 q2) 
+  `orElse`
+  do parseBaseQueryExpr
 
-parseBool :: Parser Bool
-parseBool =
-  do stringLiteral "true"
-     return True
-  `orElse`
-  do stringLiteral "True"
-     return True
-  `orElse`
-  do stringLiteral "false"
-     return False
-  `orElse`
-  do stringLiteral "False"
-     return False
-
-
+-- | Parses a base query expression. A base query expression is any query expression that is contiguous and not separated by any operators.
 parseBaseQueryExpr :: Parser Query
 parseBaseQueryExpr =
   do q <- parseBrackets
      whitespaces
      return q
   `orElse`
-  do stringLiteral "Elements"
+  do q <- parseSelect
      whitespaces
-     return Elements
-  `orElse`
-  do stringLiteral "Select"
-     whitespaces
-     q <- parseQueryExpr
-     return (Select q)
+     return q
   `orElse`
   do q <- parseChainedField
      whitespaces
@@ -154,39 +126,84 @@ parseBaseQueryExpr =
   `orElse`
   do failParse "Invalid query structure!"
 
-parseQueryExpr :: Parser Query
-parseQueryExpr =
-  do parsePipe
-  `orElse`
-  do (q1, q2) <- parseComparison "=="
+-- | Parses a dual query expression. A dual query expression is a query expression that is split into two query expressions, separated by some operator.
+parseDualExpr :: String -> Parser (Query, Query)
+parseDualExpr c =
+   do q1 <- parseBaseQueryExpr
+      whitespaces
+      stringLiteral c
+      whitespaces
+      q2 <- parseComplexQueryExpr
+      return (q1, q2)
+
+-- | Parses a bracketed query expression. A bracketed query expression is a query expression surrounded by brackets '(' and ')'.
+parseBrackets :: Parser Query
+parseBrackets =
+  do isChar '('
      whitespaces
-     return (Equal q1 q2)
-  `orElse`
-  do (q1, q2) <- parseComparison "!="
+     q <- parseComplexQueryExpr
      whitespaces
-     return (NotEqual q1 q2)
-  `orElse`
-  do (q1, q2) <- parseComparison "<"
-     whitespaces
-     return (LessThan q1 q2) 
-  `orElse`
-  do (q1, q2) <- parseComparison "<="
-     whitespaces
-     return (LessOrEqual q1 q2) 
-  `orElse`
-  do (q1, q2) <- parseComparison ">"
-     whitespaces
-     return (GreaterThan q1 q2) 
-  `orElse`
-  do (q1, q2) <- parseComparison ">="
-     whitespaces
-     return (GreaterOrEqual q1 q2) 
-  `orElse`
-  do parseBaseQueryExpr
-  
-parseQuery :: Parser Query
-parseQuery =
-  do whitespaces
-     q <- parseQueryExpr
-     whitespaces
+     isChar ')'
      return q
+
+-- | Parses a select expression. A select expression is the keyword 'select' followed by a bracketed query expression.
+parseSelect :: Parser Query
+parseSelect =
+  do stringLiteral "select"
+     whitespaces
+     isChar '('
+     whitespaces
+     q <- parseComplexQueryExpr
+     whitespaces
+     isChar ')'
+     return (Select q)
+
+-- | Parses chained fields. A chained field is a sequence of fields separated by the dot character '.'.
+--
+-- For example:
+--
+-- >  parseChainedField "a.b.c"
+--
+-- returns
+--
+-- >  Pipe (Field "a") (Pipe (Field "b") (Field "c"))
+parseChainedField :: Parser Query
+parseChainedField =
+  do field <- parseField
+     chainedField <- parseChainedField
+     return (Pipe field chainedField)
+  `orElse`
+  do parseField
+
+-- | Parses a field name. A field name is a non-empty sequence of non whitespace characters. 
+--
+-- A field name can also be a quoted string to allow for whitespace, dots and brackets.
+-- 
+-- If the field name is given as '[]' then it is parsed as the 'Elements' query.
+parseField :: Parser Query
+parseField =
+   do stringLiteral ".[]"
+      return Elements
+   `orElse`
+   do isChar '.'
+      fstr <- quotedString
+      return (Field fstr)
+   `orElse`
+   do isChar '.'
+      field <- oneOrMore (satisfies "non-whitespace or chain character" (\c -> c /= ' ' && c /= '\n' && c /= '\t' && c /= '.' && c /= '[' && c /= ']'))
+      return (Field field)
+
+-- | Parses a boolean value. A boolean value is either 'true' or 'false' (first letter case insensitive).
+parseBool :: Parser Bool
+parseBool =
+  do stringLiteral "true"
+     return True
+  `orElse`
+  do stringLiteral "True"
+     return True
+  `orElse`
+  do stringLiteral "false"
+     return False
+  `orElse`
+  do stringLiteral "False"
+     return False
