@@ -1,4 +1,4 @@
-module JSONTransformer (Transformer, field, select, pipe, string, int, comparison, elements, bool, tNull, concatenate, identity, tAnd, tOr, tNot) where
+module JSONTransformer (Transformer, field, select, pipe, string, int, comparison, elements, bool, tNull, concatenate, identity, tAnd, tOr, tNot, arithmetic) where
 
 import JSON
 import Result
@@ -231,3 +231,20 @@ tNot :: Transformer -> Transformer
 tNot t json =
     do xs <- t json
        return [Boolean (not (any getTruthy xs))]
+
+arithmetic :: (Int -> Int -> Int) -> Transformer -> Transformer -> Transformer
+arithmetic f t1 t2 json =
+    do xs <- t1 json
+       ys <- t2 json
+       case (xs, f, ys) of
+           ([Number x],  f,  [Number y]) -> return [Number (x `f` y)]
+           ([Null],     (+), y         ) -> return y
+           (x,          (+), [Null]    ) -> return x
+           ([Array as], (+), [Array ys]) -> return [Array (as ++ ys)]
+           -- (-) Arrays : remove all occurrences of the second array's elements from the first array (Unimplemented)
+           ([String s], (+), [String t]) -> return [String (s ++ t)]
+           ([Number n], (*), [String s]) -> return [String (concat (replicate n s))]
+           ([String s], (*), [Number n]) -> return [String (concat (replicate n s))]
+           -- (/) Strings : Split the first using the second as separators (Unimplemented)
+           -- (+) Objects : merge the two objects (Unimplemented)
+           _                             -> Error "Invalid arguments to arithmetic function"

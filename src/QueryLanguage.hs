@@ -24,6 +24,11 @@ data Query
   | And            Query Query
   | Or             Query Query
   | Not            Query
+  | Add            Query Query
+  | Subtract       Query Query
+  | Multiply       Query Query
+  | Divide         Query Query
+  | Modulo         Query Query
   | None
   deriving Show
 
@@ -59,6 +64,11 @@ execute (GreaterOrEqual q1 q2) = comparison (>=) (execute q1) (execute q2)
 execute (And q1 q2)            = tAnd (execute q1) (execute q2)
 execute (Or q1 q2)             = tOr  (execute q1) (execute q2)
 execute (Not q)                = tNot (execute q)
+execute (Add q1 q2)            = arithmetic (+) (execute q1) (execute q2)
+execute (Subtract q1 q2)       = arithmetic (-) (execute q1) (execute q2)
+execute (Multiply q1 q2)       = arithmetic (*) (execute q1) (execute q2)
+execute (Divide q1 q2)         = arithmetic div (execute q1) (execute q2)
+execute (Modulo q1 q2)         = arithmetic mod (execute q1) (execute q2)
 execute None = identity
 
 -- HINT: this function is very similar to the 'eval' function for
@@ -76,66 +86,75 @@ parseQuery =
 
 parseCombinatoryQueryExpr :: Parser Query
 parseCombinatoryQueryExpr =
-  do (q1, q2) <- parseCombinatoryExpr "|"
+  do (q1, q2) <- combinatoryExpr "|"
      whitespaces
      return (Pipe q1 q2)
   `orElse`
-  do (q1, q2) <- parseCombinatoryExpr ","
+  do (q1, q2) <- combinatoryExpr ","
      whitespaces
      return (Concat q1 q2)
   `orElse`
-  do parseConditionalQueryExpr
+  parseConditionalQueryExpr
 
 parseConditionalQueryExpr :: Parser Query
 parseConditionalQueryExpr =
-  do (q1, q2) <- parseConditionalExpr "and"
+  do (q1, q2) <- conditionalExpr "and"
      whitespaces
      return (And q1 q2)
   `orElse`
-  do (q1, q2) <- parseConditionalExpr "&&"
+  do (q1, q2) <- conditionalExpr "&&"
      whitespaces
      return (And q1 q2)
   `orElse`
-  do (q1, q2) <- parseConditionalExpr "or"
+  do (q1, q2) <- conditionalExpr "or"
      whitespaces
      return (Or q1 q2)
   `orElse`
-  do (q1, q2) <- parseConditionalExpr "||"
+  do (q1, q2) <- conditionalExpr "||"
      whitespaces
      return (Or q1 q2)
   `orElse`
-  do parseComparisonQueryExpr
+   parseComparisonQueryExpr
 
 -- | Parses a comparison query expression. A comparison query expression is one of the following:
 -- - A query expression that splits into a base query expression and a comparison query expression, separated by some operator.
 -- - A base query expression.
 parseComparisonQueryExpr :: Parser Query
 parseComparisonQueryExpr =
-  do (q1, q2) <- parseComparisonExpr "=="
+  do (q1, q2) <- comparisonExpr "=="
      whitespaces
      return (Equal q1 q2)
   `orElse`
-  do (q1, q2) <- parseComparisonExpr "!="
+  do (q1, q2) <- comparisonExpr "!="
      whitespaces
      return (NotEqual q1 q2)
   `orElse`
-  do (q1, q2) <- parseComparisonExpr "<"
+  do (q1, q2) <- comparisonExpr "<"
      whitespaces
      return (LessThan q1 q2) 
   `orElse`
-  do (q1, q2) <- parseComparisonExpr "<="
+  do (q1, q2) <- comparisonExpr "<="
      whitespaces
      return (LessOrEqual q1 q2) 
   `orElse`
-  do (q1, q2) <- parseComparisonExpr ">"
+  do (q1, q2) <- comparisonExpr ">"
      whitespaces
      return (GreaterThan q1 q2) 
   `orElse`
-  do (q1, q2) <- parseComparisonExpr ">="
+  do (q1, q2) <- comparisonExpr ">="
      whitespaces
-     return (GreaterOrEqual q1 q2) 
+     return (GreaterOrEqual q1 q2)
   `orElse`
-  do parseBaseQueryExpr
+   parseArithmeticQueryExpr
+
+-- | Parses an arithmetic query expression. An arithmetic query expression is one of the following:
+-- - A query expression that forms an arithmetic expression built from base query expressions and arithmetic operators.
+-- - A base query expression.
+parseArithmeticQueryExpr :: Parser Query
+parseArithmeticQueryExpr =
+  do q <- arithmeticExpr
+     whitespaces
+     return q
 
 -- | Parses a base query expression. A base query expression is any query expression that is contiguous and not separated by any operators.
 parseBaseQueryExpr :: Parser Query
@@ -173,8 +192,8 @@ parseBaseQueryExpr =
   do failParse "Invalid query structure!"
 
 -- 
-parseCombinatoryExpr :: String -> Parser (Query, Query)
-parseCombinatoryExpr c =
+combinatoryExpr :: String -> Parser (Query, Query)
+combinatoryExpr c =
   do q1 <- parseConditionalQueryExpr
      whitespaces
      stringLiteral c
@@ -183,8 +202,8 @@ parseCombinatoryExpr c =
      return (q1, q2)
 
 -- 
-parseConditionalExpr :: String -> Parser (Query, Query)
-parseConditionalExpr c =
+conditionalExpr :: String -> Parser (Query, Query)
+conditionalExpr c =
    do q1 <- parseComparisonQueryExpr
       whitespaces
       stringLiteral c
@@ -194,8 +213,8 @@ parseConditionalExpr c =
 
 -- | Parses a comparison expression. A comparison expression is a comparison query expression that is split into
 -- a base query expression and a comparison query expression, separated by some operator.
-parseComparisonExpr :: String -> Parser (Query, Query)
-parseComparisonExpr c =
+comparisonExpr :: String -> Parser (Query, Query)
+comparisonExpr c =
    do q1 <- parseBaseQueryExpr
       whitespaces
       stringLiteral c
@@ -203,13 +222,69 @@ parseComparisonExpr c =
       q2 <- parseComparisonQueryExpr
       return (q1, q2)
 
+arithmeticExpr :: Parser Query
+arithmeticExpr = do subtractExpr
+
+subtractExpr :: Parser Query
+subtractExpr =
+  do e1 <- addExpr
+     whitespaces
+     isChar '-'
+     whitespaces
+     e2 <- subtractExpr
+     return (Subtract e1 e2)
+  `orElse`
+   addExpr
+
+addExpr :: Parser Query
+addExpr =
+  do e1 <- multiplyExpr
+     whitespaces
+     isChar '+'
+     whitespaces
+     e2 <- addExpr
+     return (Add e1 e2)
+   `orElse`
+   multiplyExpr
+
+multiplyExpr :: Parser Query
+multiplyExpr =
+  do e1 <- moduloExpr
+     whitespaces
+     isChar '*'
+     whitespaces
+     e2 <- multiplyExpr
+     return (Multiply e1 e2)
+   `orElse`
+   moduloExpr
+
+moduloExpr :: Parser Query
+moduloExpr =
+  do e1 <- divideExpr
+     whitespaces
+     isChar '%'
+     whitespaces
+     e2 <- moduloExpr
+     return (Modulo e1 e2)
+   `orElse`
+   divideExpr
+
+divideExpr :: Parser Query
+divideExpr =
+  do e1 <- parseBaseQueryExpr
+     whitespaces
+     isChar '/'
+     whitespaces
+     e2 <- divideExpr
+     return (Divide e1 e2)
+   `orElse`
+   parseBaseQueryExpr
+
 -- | Parses a bracketed query expression. A bracketed query expression is a query expression surrounded by brackets '(' and ')'.
 parseBrackets :: Parser Query
 parseBrackets =
   do isChar '('
-     whitespaces
-     q <- parseCombinatoryQueryExpr
-     whitespaces
+     q <- parseQuery
      isChar ')'
      return q
 
@@ -219,9 +294,7 @@ parseSelect =
   do stringLiteral "select"
      whitespaces
      isChar '('
-     whitespaces
-     q <- parseCombinatoryQueryExpr
-     whitespaces
+     q <- parseQuery
      isChar ')'
      return (Select q)
 
@@ -300,8 +373,6 @@ parseBool =
 parseArrayItems :: Parser Query
 parseArrayItems =
    do isChar '['
-      whitespaces
-      xs <- parseCombinatoryQueryExpr
-      whitespaces
+      xs <- parseQuery
       isChar ']'
       return xs
