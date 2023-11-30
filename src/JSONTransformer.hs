@@ -1,4 +1,4 @@
-module JSONTransformer (Transformer, field, select, pipe, string, int, bool, comparison, elements, concatenate) where
+module JSONTransformer (Transformer, field, select, pipe, string, int, bool, comparison, elements, concatenate, identity) where
 
 import JSON
 import Result
@@ -188,8 +188,13 @@ extractMaybeBool _           = False
 
 -- | Additional Transformers | --
 
+-- | Concatenates the results of two transformers into a single list.
 concatenate :: Transformer -> Transformer -> Transformer
 concatenate t1 t2 json =
     do xs <- t1 json
        ys <- t2 json
        return [Array (xs ++ ys)]
+
+-- | Returns the input unchanged.
+identity :: Transformer
+identity json = Ok [json]

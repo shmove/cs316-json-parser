@@ -20,6 +20,7 @@ data Query
   | LessOrEqual    Query Query
   | GreaterThan    Query Query
   | GreaterOrEqual Query Query
+  | None
   deriving Show
 
 -- | Executes a 'Query' by translating it into a `Transformer`. Each
@@ -50,6 +51,7 @@ execute (LessThan q1 q2)       = comparison (<)  (execute q1) (execute q2)
 execute (LessOrEqual q1 q2)    = comparison (<=) (execute q1) (execute q2)
 execute (GreaterThan q1 q2)    = comparison (>)  (execute q1) (execute q2)
 execute (GreaterOrEqual q1 q2) = comparison (>=) (execute q1) (execute q2)
+execute None = identity
 
 -- HINT: this function is very similar to the 'eval' function for
 -- evaluating Boolean formulas defined in the Week03 problems.
@@ -205,6 +207,9 @@ parseField =
    do isChar '.'
       field <- oneOrMore (satisfies "non-whitespace or query character" (\c -> c /= ' ' && c /= '\n' && c /= '\t' && c /= '.' && c /= '[' && c /= ']' && c /= ',' && c /= '(' && c /= ')'))
       return (Field field)
+   `orElse`
+   do isChar '.'
+      return None
 
 -- | Parses a boolean value. A boolean value is either 'true' or 'false' (first letter case insensitive).
 parseBool :: Parser Bool
