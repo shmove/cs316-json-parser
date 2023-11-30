@@ -7,6 +7,7 @@ import ParserCombinators
 
 data Query
   = Pipe        Query Query
+  | Concat      Query Query
   | Field       String
   | Elements
   | Select      Query
@@ -36,6 +37,7 @@ data Query
 -- which is the behaviour of `elements` on this input.
 execute :: Query -> Transformer
 execute (Pipe q1 q2)    = pipe (execute q1) (execute q2)
+execute (Concat q1 q2)  = concatenate (execute q1) (execute q2)
 execute (Field str)     = field str
 execute Elements        = elements
 execute (Select q)      = select (execute q)
@@ -71,6 +73,10 @@ parseComplexQueryExpr =
      whitespaces
      return (Pipe q1 q2)
   `orElse`
+  do (q1, q2) <- parseDualExpr ","
+     whitespaces
+     return (Concat q1 q2)
+  `orElse`
   do (q1, q2) <- parseDualExpr "=="
      whitespaces
      return (Equal q1 q2)
@@ -105,6 +111,10 @@ parseBaseQueryExpr =
      return q
   `orElse`
   do q <- parseSelect
+     whitespaces
+     return q
+  `orElse`
+  do q <- parseArrayItems
      whitespaces
      return q
   `orElse`
@@ -175,14 +185,17 @@ parseChainedField =
   `orElse`
   do parseField
 
--- | Parses a field name. A field name is a non-empty sequence of non whitespace characters. 
+-- | Parses a field name. A field name is a non-empty sequence of non whitespace / disallowed characters. 
 --
 -- A field name can also be a quoted string to allow for whitespace, dots and brackets.
 -- 
 -- If the field name is given as '[]' then it is parsed as the 'Elements' query.
 parseField :: Parser Query
 parseField =
-   do stringLiteral ".[]"
+   do isChar '.'
+      isChar '['
+      whitespaces
+      isChar ']'
       return Elements
    `orElse`
    do isChar '.'
@@ -190,7 +203,7 @@ parseField =
       return (Field fstr)
    `orElse`
    do isChar '.'
-      field <- oneOrMore (satisfies "non-whitespace or chain character" (\c -> c /= ' ' && c /= '\n' && c /= '\t' && c /= '.' && c /= '[' && c /= ']'))
+      field <- oneOrMore (satisfies "non-whitespace or query character" (\c -> c /= ' ' && c /= '\n' && c /= '\t' && c /= '.' && c /= '[' && c /= ']' && c /= ',' && c /= '(' && c /= ')'))
       return (Field field)
 
 -- | Parses a boolean value. A boolean value is either 'true' or 'false' (first letter case insensitive).
@@ -207,3 +220,13 @@ parseBool =
   `orElse`
   do stringLiteral "False"
      return False
+
+-- | Parses an array of queries. An array of queries is a sequence of query expressions separated by commas ',' and surrounded by square brackets '[' and ']'.
+parseArrayItems :: Parser Query
+parseArrayItems =
+   do isChar '['
+      whitespaces
+      xs <- parseComplexQueryExpr
+      whitespaces
+      isChar ']'
+      return xs

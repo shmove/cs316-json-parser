@@ -38,7 +38,8 @@ main =
      queryStr <- getLine
      (query,leftover) <- abortOnError (runParser parseQuery queryStr)
      
-     putStrLn ("Running query " ++ show query ++ " on " ++ filename ++ "...")
+     --putStrLn ("Running query " ++ show query ++ " on " ++ filename ++ "... (leftover input: \"" ++ leftover ++ "\")")
+     putStrLn ("Running query on " ++ filename ++ "... (leftover input: \"" ++ leftover ++ "\")")
      -- FIXME: the query langauge is quite inexpressive. What if the
      -- user wants all hills over 1000 metres in Scotland and Wales?
      -- or something else? What if they want to transform the input

@@ -1,4 +1,4 @@
-module JSONTransformer (Transformer, field, select, pipe, string, int, bool, comparison, elements) where
+module JSONTransformer (Transformer, field, select, pipe, string, int, bool, comparison, elements, concatenate) where
 
 import JSON
 import Result
@@ -185,3 +185,11 @@ extractMaybeBool _           = False
 -- boolean from the 'JSON' value using 'getBool' in the 'JSON'
 -- module. You might want to write a helper function to convert a
 -- 'Maybe Bool' to a 'Bool'.
+
+-- | Additional Transformers | --
+
+concatenate :: Transformer -> Transformer -> Transformer
+concatenate t1 t2 json =
+    do xs <- t1 json
+       ys <- t2 json
+       return [Array (xs ++ ys)]
