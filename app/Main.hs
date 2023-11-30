@@ -11,7 +11,7 @@ import Result
 -- query :: Query
 -- query = Elements `Pipe` Select (Field "Country" `Equal` ConstString "S")
 -- The new query language way of writing the above is:
--- query = "Elements | Select .Country == \"S\""
+-- query = ".[] | select (.Country == \"S\"")
 
 main :: IO ()
 main =
@@ -37,22 +37,26 @@ main =
      putStrLn "Please enter your query:"
      queryStr <- getLine
      (query,leftover) <- abortOnError (runParser parseQuery queryStr)
-     
-     --putStrLn ("Running query " ++ show query ++ " on " ++ filename ++ "... (leftover input: \"" ++ leftover ++ "\")")
-     putStrLn ("Running query on " ++ filename ++ "... (leftover input: \"" ++ leftover ++ "\")")
-     -- FIXME: the query langauge is quite inexpressive. What if the
-     -- user wants all hills over 1000 metres in Scotland and Wales?
-     -- or something else? What if they want to transform the input
-     -- and not just filter it?
-     --
-     -- FIXME: The query might be incompatible with the input data. It
-     -- might mention fields that the input does not have. Can these
-     -- errors be reported back to the user nicely?
-     outputJSONs <- abortOnError (execute query inputJSON)
 
-     -- Print the output, one per line.
-     --
-     -- FIXME: what if the user wants the JSON output to be nicely
-     -- formatted? Or in colour? Or in another format, like HTML or
-     -- CSV?
-     mapM_ (putStrLn . renderJSON) outputJSONs
+     if leftover /= "" then
+       do putStrLn ("Failed to parse entire query! Got: " ++ show query)
+          putStrLn ("Leftover input: \"" ++ leftover ++ "\"")
+          return ()
+     else
+       do putStrLn ("Running query on " ++ filename ++ "... (leftover input: \"" ++ leftover ++ "\")")
+          -- FIXME: the query langauge is quite inexpressive. What if the
+          -- user wants all hills over 1000 metres in Scotland and Wales?
+          -- or something else? What if they want to transform the input
+          -- and not just filter it?
+          --
+          -- FIXME: The query might be incompatible with the input data. It
+          -- might mention fields that the input does not have. Can these
+          -- errors be reported back to the user nicely?
+          outputJSONs <- abortOnError (execute query inputJSON)
+
+          -- Print the output, one per line.
+          --
+          -- FIXME: what if the user wants the JSON output to be nicely
+          -- formatted? Or in colour? Or in another format, like HTML or
+          -- CSV?
+          mapM_ (putStrLn . renderJSON) outputJSONs

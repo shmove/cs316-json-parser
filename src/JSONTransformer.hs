@@ -1,4 +1,4 @@
-module JSONTransformer (Transformer, field, select, pipe, string, int, bool, comparison, elements, concatenate, identity) where
+module JSONTransformer (Transformer, field, select, pipe, string, int, comparison, elements, bool, tNull, concatenate, identity, tAnd, tOr, tNot) where
 
 import JSON
 import Result
@@ -43,11 +43,6 @@ string s _ = Ok [String s]
 --  > [Number 1234]
 int :: Int -> Transformer
 int i _ = Ok [Number i]
-
--- | Ignores the 'JSON' input and returns the given boolean as a piece
--- of 'JSON' in a one element list.
-bool :: Bool -> Transformer
-bool b _ = Ok [Boolean b]
 
 -- HINT: these two functions are similar to the 'literal' function in
 -- the paper linked above.
@@ -169,9 +164,12 @@ comparison c t1 t2 json =
 
 -- | Filter the input. If the transformer argument returns 'true' for
 -- the input, then return the input in a single element list. If the
--- transformer argument does not return 'true' then return
-select :: Transformer -> Transformer
-select t json =
+-- transformer argument does not return 'true' then return '[]'.
+--
+-- Note: this is the function as originally described, but its use is
+-- replaced by 'select' below.
+select0 :: Transformer -> Transformer
+select0 t json =
     do js <- t json
        if any (extractMaybeBool . getBool) js then return [json] else return []
 
@@ -188,6 +186,24 @@ extractMaybeBool _           = False
 
 -- | Additional Transformers | --
 
+-- | Filter the input. If the transformer argument returns truthy for
+-- the input, then return the input in a single element list. If the
+-- transformer argument does not return truthy then return '[]'.
+select :: Transformer -> Transformer
+select t json =
+    do js <- t json
+       if any getTruthy js then return [json] else return []
+
+-- | Ignores the 'JSON' input and returns the given boolean as a piece
+-- of 'JSON' in a one element list.
+bool :: Bool -> Transformer
+bool b _ = Ok [Boolean b]
+
+-- | Ignores the 'JSON' input and returns 'Null' as a piece of 'JSON'
+-- in a one element list.
+tNull :: Transformer
+tNull _ = Ok [Null]
+
 -- | Concatenates the results of two transformers into a single list.
 concatenate :: Transformer -> Transformer -> Transformer
 concatenate t1 t2 json =
@@ -198,3 +214,20 @@ concatenate t1 t2 json =
 -- | Returns the input unchanged.
 identity :: Transformer
 identity json = Ok [json]
+
+tAnd :: Transformer -> Transformer -> Transformer
+tAnd t1 t2 json =
+    do xs <- t1 json
+       ys <- t2 json
+       return [Boolean (all getTruthy xs && all getTruthy ys)]
+
+tOr :: Transformer -> Transformer -> Transformer
+tOr t1 t2 json =
+    do xs <- t1 json
+       ys <- t2 json
+       return [Boolean (any getTruthy xs || any getTruthy ys)]
+
+tNot :: Transformer -> Transformer
+tNot t json =
+    do xs <- t json
+       return [Boolean (not (any getTruthy xs))]

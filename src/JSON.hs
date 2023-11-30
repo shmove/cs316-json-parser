@@ -40,3 +40,11 @@ getElements _             = Nothing
 getBool :: JSON -> Maybe Bool
 getBool (Boolean b) = Just b
 getBool _           = Nothing
+
+-- | Returns whether a JSON value is truthy or falsy.
+-- Falsy values are False and Null.
+-- https://jqlang.github.io/jq/manual/#if-then-else-end
+getTruthy :: JSON -> Bool
+getTruthy (Boolean False) = False
+getTruthy Null            = False
+getTruthy _               = True

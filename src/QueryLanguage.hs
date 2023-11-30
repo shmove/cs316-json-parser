@@ -6,20 +6,24 @@ import JSONTransformer
 import ParserCombinators
 
 data Query
-  = Pipe        Query Query
-  | Concat      Query Query
-  | Field       String
+  = Pipe           Query Query
+  | Concat         Query Query
+  | Field          String
   | Elements
-  | Select      Query
-  | ConstBool   Bool
-  | ConstInt    Int
-  | ConstString String
+  | Select         Query
+  | ConstString    String
+  | ConstBool      Bool
+  | ConstNull
+  | ConstInt       Int
   | Equal          Query Query
   | NotEqual       Query Query
   | LessThan       Query Query
   | LessOrEqual    Query Query
   | GreaterThan    Query Query
   | GreaterOrEqual Query Query
+  | And            Query Query
+  | Or             Query Query
+  | Not            Query
   | None
   deriving Show
 
@@ -42,15 +46,19 @@ execute (Concat q1 q2)  = concatenate (execute q1) (execute q2)
 execute (Field str)     = field str
 execute Elements        = elements
 execute (Select q)      = select (execute q)
-execute (ConstBool b)   = bool b
-execute (ConstInt n)    = int n
 execute (ConstString s) = string s
+execute (ConstBool b)   = bool b
+execute ConstNull       = tNull
+execute (ConstInt n)    = int n
 execute (Equal q1 q2)          = comparison (==) (execute q1) (execute q2)
 execute (NotEqual q1 q2)       = comparison (/=) (execute q1) (execute q2)
 execute (LessThan q1 q2)       = comparison (<)  (execute q1) (execute q2)
 execute (LessOrEqual q1 q2)    = comparison (<=) (execute q1) (execute q2)
 execute (GreaterThan q1 q2)    = comparison (>)  (execute q1) (execute q2)
 execute (GreaterOrEqual q1 q2) = comparison (>=) (execute q1) (execute q2)
+execute (And q1 q2)            = tAnd (execute q1) (execute q2)
+execute (Or q1 q2)             = tOr  (execute q1) (execute q2)
+execute (Not q)                = tNot (execute q)
 execute None = identity
 
 -- HINT: this function is very similar to the 'eval' function for
@@ -62,44 +70,68 @@ execute None = identity
 parseQuery :: Parser Query
 parseQuery =
   do whitespaces
-     q <- parseComplexQueryExpr
+     q <- parseCombinatoryQueryExpr
      whitespaces
      return q
 
--- | Parses a complex query expression. A complex query expression is one of the following:
--- - A query expression that splits into a base query expression and a complex query expression, separated by some operator.
--- - A base query expression.
-parseComplexQueryExpr :: Parser Query
-parseComplexQueryExpr =
-  do (q1, q2) <- parseDualExpr "|"
+parseCombinatoryQueryExpr :: Parser Query
+parseCombinatoryQueryExpr =
+  do (q1, q2) <- parseCombinatoryExpr "|"
      whitespaces
      return (Pipe q1 q2)
   `orElse`
-  do (q1, q2) <- parseDualExpr ","
+  do (q1, q2) <- parseCombinatoryExpr ","
      whitespaces
      return (Concat q1 q2)
   `orElse`
-  do (q1, q2) <- parseDualExpr "=="
+  do parseConditionalQueryExpr
+
+parseConditionalQueryExpr :: Parser Query
+parseConditionalQueryExpr =
+  do (q1, q2) <- parseConditionalExpr "and"
+     whitespaces
+     return (And q1 q2)
+  `orElse`
+  do (q1, q2) <- parseConditionalExpr "&&"
+     whitespaces
+     return (And q1 q2)
+  `orElse`
+  do (q1, q2) <- parseConditionalExpr "or"
+     whitespaces
+     return (Or q1 q2)
+  `orElse`
+  do (q1, q2) <- parseConditionalExpr "||"
+     whitespaces
+     return (Or q1 q2)
+  `orElse`
+  do parseComparisonQueryExpr
+
+-- | Parses a comparison query expression. A comparison query expression is one of the following:
+-- - A query expression that splits into a base query expression and a comparison query expression, separated by some operator.
+-- - A base query expression.
+parseComparisonQueryExpr :: Parser Query
+parseComparisonQueryExpr =
+  do (q1, q2) <- parseComparisonExpr "=="
      whitespaces
      return (Equal q1 q2)
   `orElse`
-  do (q1, q2) <- parseDualExpr "!="
+  do (q1, q2) <- parseComparisonExpr "!="
      whitespaces
      return (NotEqual q1 q2)
   `orElse`
-  do (q1, q2) <- parseDualExpr "<"
+  do (q1, q2) <- parseComparisonExpr "<"
      whitespaces
      return (LessThan q1 q2) 
   `orElse`
-  do (q1, q2) <- parseDualExpr "<="
+  do (q1, q2) <- parseComparisonExpr "<="
      whitespaces
      return (LessOrEqual q1 q2) 
   `orElse`
-  do (q1, q2) <- parseDualExpr ">"
+  do (q1, q2) <- parseComparisonExpr ">"
      whitespaces
      return (GreaterThan q1 q2) 
   `orElse`
-  do (q1, q2) <- parseDualExpr ">="
+  do (q1, q2) <- parseComparisonExpr ">="
      whitespaces
      return (GreaterOrEqual q1 q2) 
   `orElse`
@@ -108,6 +140,16 @@ parseComplexQueryExpr =
 -- | Parses a base query expression. A base query expression is any query expression that is contiguous and not separated by any operators.
 parseBaseQueryExpr :: Parser Query
 parseBaseQueryExpr =
+  do stringLiteral "not"
+     whitespaces
+     q <- parseBaseQueryExpr
+     return (Not q)
+  `orElse`
+  do stringLiteral "!"
+     whitespaces
+     q <- parseBaseQueryExpr
+     return (Not q)
+  `orElse`
   do q <- parseBrackets
      whitespaces
      return q
@@ -124,28 +166,41 @@ parseBaseQueryExpr =
      whitespaces
      return q
   `orElse`
-  do b <- parseBool
+  do q <- parseConst
      whitespaces
-     return (ConstBool b)
-  `orElse`
-  do str <- quotedString
-     whitespaces
-     return (ConstString str)
-  `orElse`
-  do num <- number
-     whitespaces
-     return (ConstInt num)
+     return q
   `orElse`
   do failParse "Invalid query structure!"
 
--- | Parses a dual query expression. A dual query expression is a query expression that is split into two query expressions, separated by some operator.
-parseDualExpr :: String -> Parser (Query, Query)
-parseDualExpr c =
+-- 
+parseCombinatoryExpr :: String -> Parser (Query, Query)
+parseCombinatoryExpr c =
+  do q1 <- parseConditionalQueryExpr
+     whitespaces
+     stringLiteral c
+     whitespaces
+     q2 <- parseCombinatoryQueryExpr
+     return (q1, q2)
+
+-- 
+parseConditionalExpr :: String -> Parser (Query, Query)
+parseConditionalExpr c =
+   do q1 <- parseComparisonQueryExpr
+      whitespaces
+      stringLiteral c
+      whitespaces
+      q2 <- parseConditionalQueryExpr
+      return (q1, q2)
+
+-- | Parses a comparison expression. A comparison expression is a comparison query expression that is split into
+-- a base query expression and a comparison query expression, separated by some operator.
+parseComparisonExpr :: String -> Parser (Query, Query)
+parseComparisonExpr c =
    do q1 <- parseBaseQueryExpr
       whitespaces
       stringLiteral c
       whitespaces
-      q2 <- parseComplexQueryExpr
+      q2 <- parseComparisonQueryExpr
       return (q1, q2)
 
 -- | Parses a bracketed query expression. A bracketed query expression is a query expression surrounded by brackets '(' and ')'.
@@ -153,7 +208,7 @@ parseBrackets :: Parser Query
 parseBrackets =
   do isChar '('
      whitespaces
-     q <- parseComplexQueryExpr
+     q <- parseCombinatoryQueryExpr
      whitespaces
      isChar ')'
      return q
@@ -165,7 +220,7 @@ parseSelect =
      whitespaces
      isChar '('
      whitespaces
-     q <- parseComplexQueryExpr
+     q <- parseCombinatoryQueryExpr
      whitespaces
      isChar ')'
      return (Select q)
@@ -211,6 +266,21 @@ parseField =
    do isChar '.'
       return None
 
+-- | Parses a query constant.
+parseConst :: Parser Query
+parseConst =
+  do b <- parseBool
+     return (ConstBool b)
+  `orElse`
+  do stringLiteral "null"
+     return ConstNull
+  `orElse`
+  do str <- quotedString
+     return (ConstString str)
+  `orElse`
+  do num <- number
+     return (ConstInt num)
+
 -- | Parses a boolean value. A boolean value is either 'true' or 'false' (first letter case insensitive).
 parseBool :: Parser Bool
 parseBool =
@@ -231,7 +301,7 @@ parseArrayItems :: Parser Query
 parseArrayItems =
    do isChar '['
       whitespaces
-      xs <- parseComplexQueryExpr
+      xs <- parseCombinatoryQueryExpr
       whitespaces
       isChar ']'
       return xs
