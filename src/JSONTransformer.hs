@@ -49,7 +49,7 @@ int i _ = Ok [Number i]
 
 
 -- | Returns all the elements of a `JSON` `Array`. If the `JSON` value
--- is not an `Array`, then it returns the empty list.
+-- is not an `Array`, then it returns an error.
 --
 -- For example,
 --
