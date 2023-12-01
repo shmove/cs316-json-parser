@@ -1,4 +1,4 @@
-module JSONTransformer (Transformer, field, select, pipe, string, int, comparison, elements, bool, tNull, concatenate, identity, tAnd, tOr, tNot, arithmetic) where
+module JSONTransformer (Transformer, field, select, pipe, string, int, comparison, elements, bool, tNull, concatenate, identity, tAnd, tOr, tNot, tAdd, tSub, tMul, tDiv, tMod) where
 
 import JSON
 import Result
@@ -215,36 +215,110 @@ concatenate t1 t2 json =
 identity :: Transformer
 identity json = Ok [json]
 
+-- | Returns whether both transformers evaluate to a truthy value.
 tAnd :: Transformer -> Transformer -> Transformer
 tAnd t1 t2 json =
     do xs <- t1 json
        ys <- t2 json
        return [Boolean (all getTruthy xs && all getTruthy ys)]
 
+-- | Returns whether either transformer evaluates to a truthy value.
 tOr :: Transformer -> Transformer -> Transformer
 tOr t1 t2 json =
     do xs <- t1 json
        ys <- t2 json
        return [Boolean (any getTruthy xs || any getTruthy ys)]
 
+-- | Returns the opposite of the transformer's truthy value.
 tNot :: Transformer -> Transformer
 tNot t json =
     do xs <- t json
        return [Boolean (not (any getTruthy xs))]
 
-arithmetic :: (Int -> Int -> Int) -> Transformer -> Transformer -> Transformer
-arithmetic f t1 t2 json =
+-- | Returns the result of an addition operation on the two transformers' results.
+--
+-- Operations:
+--
+--   Numbers : arithmetic operations
+--
+--   Null + Any : Return the non-null value
+--
+--   Arrays : concatenate two arrays
+--
+--   Strings : concatenate two strings
+--
+--   Objects : merge the two objects (Unimplemented)
+tAdd :: Transformer -> Transformer -> Transformer
+tAdd t1 t2 json =
     do xs <- t1 json
        ys <- t2 json
-       case (xs, f, ys) of
-           ([Number x],  f,  [Number y]) -> return [Number (x `f` y)]
-           ([Null],     (+), y         ) -> return y
-           (x,          (+), [Null]    ) -> return x
-           ([Array as], (+), [Array ys]) -> return [Array (as ++ ys)]
-           -- (-) Arrays : remove all occurrences of the second array's elements from the first array (Unimplemented)
-           ([String s], (+), [String t]) -> return [String (s ++ t)]
-           ([Number n], (*), [String s]) -> return [String (concat (replicate n s))]
-           ([String s], (*), [Number n]) -> return [String (concat (replicate n s))]
-           -- (/) Strings : Split the first using the second as separators (Unimplemented)
-           -- (+) Objects : merge the two objects (Unimplemented)
-           _                             -> Error "Invalid arguments to arithmetic function"
+       (case (xs, ys) of
+           ([Number x], [Number y]) -> return [Number (x + y)]
+           ([Null],     y         ) -> return y
+           (x,          [Null]    ) -> return x
+           ([Array as], [Array ys]) -> return [Array (as ++ ys)]
+           ([String s], [String t]) -> return [String (s ++ t)]
+           -- Objects : merge the two objects (Unimplemented)
+           _                        -> Error "Invalid addition operation")
+
+-- | Returns the result of a subtraction operation on the two transformers' results.
+-- 
+-- Operations:
+--
+--   Numbers : arithmetic operations
+--
+--   Arrays : remove all occurrences of the second array's elements from the first array (Unimplemented)
+tSub :: Transformer -> Transformer -> Transformer
+tSub t1 t2 json =
+    do xs <- t1 json
+       ys <- t2 json
+       (case (xs, ys) of
+           ([Number x], [Number y]) -> return [Number (x - y)]
+           -- Arrays : remove all occurrences of the second array's elements from the first array (Unimplemented)
+           _                        -> Error "Invalid subtraction operation")
+
+-- | Returns the result of a multiplication operation on the two transformers' results.
+--
+-- Operations:
+--
+--   Numbers : arithmetic operations
+--
+--   String * Number : repeat the string n times
+tMul :: Transformer -> Transformer -> Transformer
+tMul t1 t2 json =
+    do xs <- t1 json
+       ys <- t2 json
+       (case (xs, ys) of
+           ([Number x], [Number y]) -> return [Number (x * y)]
+           ([Number n], [String s]) -> return [String (concat (replicate n s))]
+           ([String s], [Number n]) -> return [String (concat (replicate n s))]
+           _                        -> Error "Invalid multiplication operation")
+
+-- | Returns the result of a division operation on the two transformers' results.
+--
+-- Operations:
+--
+--   Numbers : arithmetic operations
+--
+--   Strings : Split the first using the second as separators (Unimplemented)
+tDiv :: Transformer -> Transformer -> Transformer
+tDiv t1 t2 json =
+    do xs <- t1 json
+       ys <- t2 json
+       (case (xs, ys) of
+           ([Number x], [Number y]) -> return [Number (x `div` y)]
+           -- Strings : Split the first using the second as separators (Unimplemented)
+           _                        -> Error "Invalid division operation")
+
+-- | Returns the result of a modulus operation on the two transformers' results.
+--
+-- Operations:
+--
+--   Numbers : arithmetic operations
+tMod :: Transformer -> Transformer -> Transformer
+tMod t1 t2 json =
+    do xs <- t1 json
+       ys <- t2 json
+       (case (xs, ys) of
+           ([Number x], [Number y]) -> return [Number (x `mod` y)]
+           _                        -> Error "Invalid modulus operation")
