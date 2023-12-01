@@ -8,31 +8,83 @@ For the original specification and build instructions, please see [here](SPECIFI
 
 After specifying the JSON file to load from as a command line argument, you will be prompted to enter a query. Queries can use any of these filters in combination.
 
+---
+
 ### Identity: `.`
 
 Returns the input unchanged.
+
+##### Example
+Input: `{"a": 1, "b": 2}`
+Query: `.`
+Output: `{"a": 1, "b": 2}`
+
+---
 
 ### Object Identifier-Index: `.a`, `.a.b`
 
 Looks up a field in the object and returns the value associated with that field.
 
-If the key contains disallowed characters, it will need to be surrounded with double quotes like this: `."£a"` or `.["£a"]`
+If the key contains disallowed characters, it will need to be surrounded with double quotes like this: `.".a"` or `.[".a"]`
+
+##### Examples
+Input: `{"a": 1, "b": 2}`
+Query: `.a`
+Output: `1`
+
+Input: `{"a": {"b": 2}}`
+Query: `.a.b`
+Output: `2`
+
+Input: `{"a": {"...": 2}}`
+Query: `.a.["..."]`
+Output: `2`
+
+---
 
 ### Elements: `.[]`
 
 Returns all the elements of an array.
 
+##### Example
+Input: `[1, 2, 3]`
+Query: `.[]`
+Output:
+`1`
+`2`
+`3`
+
+---
+
 ### Comma: `,`
 
 Runs two filters on the input and concatenates the results in order.
+
+##### Example
+Input: `{"a": 1, "b": 2}`
+Query: `.a, .b`
+Output: 
+`1`
+`2`
+
+---
 
 ### Pipe: `|`
 
 Combines two filters by feeding the output of the first into the second. If the first filter produces multiple results, the second filter will be run on each of them.
 
-### Constant Values: `"string"`, `True`, `null`, `2`
+##### Example
+Input: `{"a": {"b": 2}}`
+Query: `.a | .b`
+Output: `2`
+
+---
+
+### Constant Values: `"string"`, `true`, `null`, `2`
 
 Strings, Booleans, null & positive Integers are all interpreted as their constant representations.
+
+---
 
 ### Addition: `+`
 
@@ -43,50 +95,136 @@ Takes two filters, applies them to the input, and adds the results together.
 - Arrays are concatenated together.
 - Strings are concatenated together.
 
+##### Examples
+Input: `{"a": 1, "b": 2}`
+Query: `.a + .b`
+Output: `3`
+
+Input: `{"a": 1, "b": 2}`
+Query: `.a + null`
+Output: `1`
+
+Input: `{"a": [1, 2], "b": [3, 4]}`
+Query: `.a + .b`
+Output: `[1, 2, 3, 4]`
+
+Input: `{"a": "hello", "b": " world"}`
+Query: `.a + .b`
+Output: `"hello world"`
+
+---
+
 ### Subtraction
 
-Takes two filters applies them to the input, and subtracts the result of the second from the first.
+Takes two filters, applies them to the input, and subtracts the result of the second from the first.
 
 - Numbers are subtracted by normal arithmetic.
 
+##### Example
+Input: `{"a": 3, "b": 2}`
+Query: `.a - .b`
+Output: `1`
+
+---
+
 ### Multiplication
 
-Takes two filters applies them to the input, and multiplies the results together.
+Takes two filters, applies them to the input, and multiplies the results together.
 
 - Numbers are multiplied by normal arithmetic.
 - Multiplying a string by a number will repeat the string that many times.
 
+##### Examples
+Input: `{"a": 3, "b": 2}`
+Query: `.a * .b`
+Output: `6`
+
+Input: `{"a": "hi", "b": 3}`
+Query: `.a * .b`
+Output: `"hihihi"`
+
+---
+
 ### Division
 
-Takes two filters applies them to the input, and divides the result of the first by the second.
+Takes two filters, applies them to the input, and divides the result of the first by the second.
 
 - Numbers are divided by integer division.
 
+##### Example
+Input: `{"a": 6, "b": 2}`
+Query: `.a / .b`
+Output: `3`
+
+---
+
 ### Modulo
 
-Takes two filters applies them to the input, and returns the remainder of the first divided by the second.
+Takes two filters, applies them to the input, and returns the remainder of the first divided by the second.
 
 - Numbers are divided by normal arithmetic.
 
+##### Example
+Input: `{"a": 5, "b": 2}`
+Query: `.a % .b`
+Output: `1`
+
+---
+
 ### `select(expression)`
 
-Produces its input unchanged if the expression evaluates as truthy (anything except `False` or `null`), or nothing otherwise.
+Produces its input unchanged if the expression evaluates as truthy (anything except `false` or `null`), or nothing otherwise.
+
+##### Example
+Input: `{"a": 1, "b": 2}`
+Query: `select(true)`
+Output: `{"a": 1, "b": 2}`
+
+---
 
 ### `==` & `!=`
 
 Takes a filter from either side, applies them to the input, and returns true if the results are equal or not equal respectively, or false otherwise.
 
+##### Example
+Input: `{"a": 1, "b": 2}`
+Query: `.a == .b`
+Output: `false`
+
+---
+
 ### `<`, `<=`, `>`, `>=`
 
 Takes a filter from either side, applies them to the input, and returns whether the first is less than, less than or equal to, greater than, or greater than or equal to the second respectively.
+
+##### Example
+Input: `{"a": 1, "b": 2}`
+Query: `.a < .b`
+Output: `true`
+
+---
 
 ### `and`, `or` [`&&`, `||`]
 
 Takes a filter from either side, applies them to the input, and follows standard boolean logic. Anything except `False` or `null` is considered truthy & will satisfy these filters. `and` has higher precedence than `or`.
 
+##### Example
+Input: `{"a": 1, "b": 2}`
+Query: `.a > 0 and .b > 0`
+Output: `true`
+
+---
+
 ### `not` [`!`]
 
 Takes a filter, applies it to the input, and inverts the truthy value of the result.
+
+##### Example
+Input: `{"a": 1, "b": 2}`
+Query: `not (.a > 0)`
+Output: `false`
+
+---
 
 ## Additional Extensions
 
