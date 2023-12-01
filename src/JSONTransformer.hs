@@ -209,7 +209,9 @@ concatenate :: Transformer -> Transformer -> Transformer
 concatenate t1 t2 json =
     do xs <- t1 json
        ys <- t2 json
-       return [Array (xs ++ ys)]
+       case ys of
+           [Array as] -> return (xs ++ as)
+           _          -> return (xs ++ ys)
 
 -- | Returns the input unchanged.
 identity :: Transformer

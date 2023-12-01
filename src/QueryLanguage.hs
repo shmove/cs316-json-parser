@@ -184,10 +184,10 @@ parseBaseQueryExpr =
      whitespaces
      return q
   `orElse`
-  do q <- parseArrayItems
-     whitespaces
-     return q
-  `orElse`
+  -- do q <- parseArrayItems
+  --    whitespaces
+  --    return q
+  -- `orElse`
   do q <- parseChainedField
      whitespaces
      return q
@@ -397,10 +397,11 @@ parseBool =
   do stringLiteral "False"
      return False
 
--- | Parses an array of queries. An array of queries is a sequence of query expressions separated by commas ',' and surrounded by square brackets '[' and ']'.
-parseArrayItems :: Parser Query
-parseArrayItems =
-   do isChar '['
-      xs <- parseQuery
-      isChar ']'
-      return xs
+-- Removed for poor functionality
+-- -- | Parses an array of queries. An array of queries is a sequence of query expressions separated by commas ',' and surrounded by square brackets '[' and ']'.
+-- parseArrayItems :: Parser Query
+-- parseArrayItems =
+--    do isChar '['
+--       xs <- parseQuery
+--       isChar ']'
+--      return xs
