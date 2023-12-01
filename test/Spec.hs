@@ -126,7 +126,7 @@ test_tNot_falsy_null = TestCase (assertEqual ("for tNot tNull (Number 1)") (Ok [
 test_tAdd_num = TestCase (assertEqual ("for tAdd (int 1) (int 2) (Number 1)") (Ok [Number 3]) (tAdd (int 1) (int 2) (Number 1)))
 test_tAdd_null = TestCase (assertEqual ("for tAdd (int 1) tNull (Number 1)") (Ok [Number 1]) (tAdd (int 1) tNull (Number 1)))
 test_tAdd_null2 = TestCase (assertEqual ("for tAdd tNull (int 1) (Number 1)") (Ok [Number 1]) (tAdd tNull (int 1) (Number 1)))
---test_tAdd_array = TestCase (assertEqual ("for tAdd (Array [Number 1, Number 2]) (Array [Number 3, Number 4]) (Number 1)") (Ok [Array [Number 1,Number 2,Number 3,Number 4]]) (tAdd (Array [Number 1, Number 2]) (Array [Number 3, Number 4]) (Number 1)))
+test_tAdd_array = TestCase (assertEqual ("for tAdd (Array [Number 1]) (Array [Number 2]) (Number 1)") (Ok [Array [Number 1, Number 1]]) (tAdd identity identity (Array [Number 1])))
 test_tAdd_string = TestCase (assertEqual ("for tAdd (string \"a\") (string \"b\") (Number 1)") (Ok [String "ab"]) (tAdd (string "a") (string "b") (Number 1)))
 test_tAdd_unsupported = TestCase (assertEqual ("for tAdd (bool True) (bool False) (Number 1)") (Error "Invalid addition operation") (tAdd (bool True) (bool False) (Number 1)))
 
@@ -167,7 +167,7 @@ jsonTransformerAdditionalTests = TestLabel "JSONTransformer Additional Tests" (T
     TestLabel "tAdd_num" test_tAdd_num,
     TestLabel "tAdd_null" test_tAdd_null,
     TestLabel "tAdd_null2" test_tAdd_null2,
-    --TestLabel "tAdd_array" test_tAdd_array,
+    TestLabel "tAdd_array" test_tAdd_array,
     TestLabel "tAdd_string" test_tAdd_string,
     TestLabel "tAdd_unsupported" test_tAdd_unsupported,
     TestLabel "tSub_num" test_tSub_num,
