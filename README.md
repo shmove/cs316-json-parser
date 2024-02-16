@@ -1,6 +1,6 @@
-# json-query : CS316 Coursework 2023
+# cs316-json-parser
 
-This is the repository for the CS316 coursework for 2023.
+A Haskell JSON parser built in the style of jQuery. Created from specifications provided in the University of Strathclyde's CS316: Functional Programming class.
 
 For the original specification and build instructions, please see [here](SPECIFICATION.md). This new README is created for the purpose of documenting features available in this implementation.
 
